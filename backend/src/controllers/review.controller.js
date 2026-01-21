@@ -24,11 +24,13 @@ const createReview = async (req, res) => {
 
     // Check if order exists and belongs to the buyer
     // It can be a regular Order or a SpecialOrder
+    let isSpecialOrder = false;
     if (orderId) {
       const order = await Order.findByPk(orderId);
       const specialOrder = !order ? await SpecialOrder.findByPk(orderId) : null;
 
       const foundOrder = order || specialOrder;
+      isSpecialOrder = !order && !!specialOrder;
 
       if (!foundOrder || foundOrder.customerId !== buyerId) {
         return res.status(400).json({
@@ -38,11 +40,11 @@ const createReview = async (req, res) => {
       }
     }
 
-    // Create review
+    // Create review - don't set orderId for special orders to avoid FK constraint
     const review = await Review.create({
       buyerId,
       traderId,
-      orderId,
+      orderId: isSpecialOrder ? null : orderId, // Only set orderId for regular orders
       rating: parseInt(rating),
       comment,
     });
