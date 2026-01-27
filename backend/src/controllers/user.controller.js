@@ -477,7 +477,8 @@ const getUserStats = async (req, res) => {
 
       if (so.status === "open" || so.status === "quoted") pendingOrders++;
       if (so.status === "accepted") confirmedOrders++;
-      if (so.status === "fulfilled") deliveredOrders++;
+      if (so.status === "fulfilled" || so.status === "closed")
+        deliveredOrders++;
     });
 
     res.json({

@@ -1,15 +1,13 @@
-const jwt = require('jsonwebtoken');
-const { User } = require('../models');
+const jwt = require("jsonwebtoken");
+const { User } = require("../models");
 
 /**
  * Generate JWT token
  */
 const generateToken = (userId) => {
-  return jwt.sign(
-    { userId },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-  );
+  return jwt.sign({ userId }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+  });
 };
 
 /**
@@ -19,29 +17,41 @@ const generateToken = (userId) => {
  */
 const register = async (req, res) => {
   try {
-    const { name, email, phone, password, role, businessName, addressStreet, addressCity, addressState, addressPincode, gstNumber } = req.body;
+    const {
+      name,
+      email,
+      phone,
+      password,
+      role,
+      businessName,
+      addressStreet,
+      addressCity,
+      addressState,
+      addressPincode,
+      gstNumber,
+    } = req.body;
 
     // Check if user already exists
-    const existingUser = await User.findOne({ 
-      where: { email } 
+    const existingUser = await User.findOne({
+      where: { email },
     });
 
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Email already registered'
+        message: "Email already registered",
       });
     }
 
     // Check phone
-    const existingPhone = await User.findOne({ 
-      where: { phone } 
+    const existingPhone = await User.findOne({
+      where: { phone },
     });
 
     if (existingPhone) {
       return res.status(400).json({
         success: false,
-        message: 'Phone number already registered'
+        message: "Phone number already registered",
       });
     }
 
@@ -51,13 +61,13 @@ const register = async (req, res) => {
       email,
       phone,
       password,
-      role: role || 'buyer',
+      role: role || "buyer",
       businessName,
       addressStreet,
       addressCity,
       addressState,
       addressPincode,
-      gstNumber
+      gstNumber,
     });
 
     // Generate token
@@ -65,34 +75,33 @@ const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful',
+      message: "Registration successful",
       data: {
         user: user.toSafeJSON(),
-        token
-      }
+        token,
+      },
     });
-
   } catch (error) {
-    console.error('Registration error:', error);
-    
-    if (error.name === 'SequelizeValidationError') {
-      const messages = error.errors.map(err => err.message);
+    console.error("Registration error:", error);
+
+    if (error.name === "SequelizeValidationError") {
+      const messages = error.errors.map((err) => err.message);
       return res.status(400).json({
         success: false,
-        message: messages.join('. ')
+        message: messages.join(". "),
       });
     }
 
-    if (error.name === 'SequelizeUniqueConstraintError') {
+    if (error.name === "SequelizeUniqueConstraintError") {
       return res.status(400).json({
         success: false,
-        message: 'Email or phone already exists'
+        message: "Email or phone already exists",
       });
     }
 
     res.status(500).json({
       success: false,
-      message: 'Error during registration. Please try again.'
+      message: "Error during registration. Please try again.",
     });
   }
 };
@@ -112,7 +121,7 @@ const login = async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: "Invalid email or password",
       });
     }
 
@@ -120,7 +129,7 @@ const login = async (req, res) => {
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Account is deactivated. Please contact support.'
+        message: "Account is deactivated. Please contact support.",
       });
     }
 
@@ -130,7 +139,7 @@ const login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: "Invalid email or password",
       });
     }
 
@@ -139,18 +148,17 @@ const login = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Login successful',
+      message: "Login successful",
       data: {
         user: user.toSafeJSON(),
-        token
-      }
+        token,
+      },
     });
-
   } catch (error) {
-    console.error('Login error:', error);
+    console.error("Login error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error during login. Please try again.'
+      message: "Error during login. Please try again.",
     });
   }
 };
@@ -167,20 +175,19 @@ const getMe = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
     res.json({
       success: true,
-      data: { user: user.toSafeJSON() }
+      data: { user: user.toSafeJSON() },
     });
-
   } catch (error) {
-    console.error('Get profile error:', error);
+    console.error("Get profile error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching profile'
+      message: "Error fetching profile",
     });
   }
 };
@@ -199,7 +206,7 @@ const updatePassword = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
@@ -209,7 +216,7 @@ const updatePassword = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({
         success: false,
-        message: 'Current password is incorrect'
+        message: "Current password is incorrect",
       });
     }
 
@@ -222,15 +229,14 @@ const updatePassword = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Password updated successfully',
-      data: { token }
+      message: "Password updated successfully",
+      data: { token },
     });
-
   } catch (error) {
-    console.error('Update password error:', error);
+    console.error("Update password error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error updating password'
+      message: "Error updating password",
     });
   }
 };
@@ -243,7 +249,7 @@ const updatePassword = async (req, res) => {
 const logout = async (req, res) => {
   res.json({
     success: true,
-    message: 'Logged out successfully'
+    message: "Logged out successfully",
   });
 };
 
@@ -255,8 +261,8 @@ const logout = async (req, res) => {
 const verifyToken = async (req, res) => {
   res.json({
     success: true,
-    message: 'Token is valid',
-    data: { user: req.user.toSafeJSON() }
+    message: "Token is valid",
+    data: { user: req.user.toSafeJSON() },
   });
 };
 
@@ -266,5 +272,5 @@ module.exports = {
   getMe,
   updatePassword,
   logout,
-  verifyToken
+  verifyToken,
 };
