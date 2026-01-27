@@ -93,6 +93,11 @@ const SpecialOrder = sequelize.define(
       allowNull: true,
       field: "delivery_address",
     },
+    paymentStatus: {
+      type: DataTypes.ENUM("pending", "received"),
+      defaultValue: "pending",
+      field: "payment_status",
+    },
   },
   {
     tableName: "special_orders",

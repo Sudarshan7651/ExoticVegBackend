@@ -69,6 +69,7 @@ router.post(
 );
 router.put("/:id/accept/:quoteId", auth, specialOrderController.acceptQuote);
 router.put("/:id/reject/:quoteId", auth, specialOrderController.rejectQuote);
+router.put("/:id/payment", auth, specialOrderController.markPaymentReceived);
 router.put("/:id/close", auth, specialOrderController.closeSpecialOrder);
 
 module.exports = router;

@@ -350,17 +350,11 @@ const acceptQuote = async (req, res) => {
       transaction,
     });
 
-    // Increment buyer's total orders and total spent
-    await User.increment(
-      {
-        totalOrders: 1,
-        totalSpent: parseFloat(quote.quotedPrice),
-      },
-      {
-        where: { id: specialOrder.customerId },
-        transaction,
-      },
-    );
+    // Increment buyer's total orders
+    await User.increment("totalOrders", {
+      where: { id: specialOrder.customerId },
+      transaction,
+    });
 
     await transaction.commit();
 
@@ -453,8 +447,20 @@ const closeSpecialOrder = async (req, res) => {
       });
     }
 
-    // Check ownership
-    if (specialOrder.customerId !== req.userId) {
+    // Check access
+    let hasAccess = false;
+    if (specialOrder.customerId === req.userId) {
+      hasAccess = true;
+    } else if (specialOrder.acceptedQuoteId) {
+      const acceptedQuote = await TraderQuote.findByPk(
+        specialOrder.acceptedQuoteId,
+      );
+      if (acceptedQuote && acceptedQuote.traderId === req.userId) {
+        hasAccess = true;
+      }
+    }
+
+    if (!hasAccess) {
       return res.status(403).json({
         success: false,
         message: "Access denied",
@@ -475,6 +481,17 @@ const closeSpecialOrder = async (req, res) => {
         },
       },
     );
+
+    // Notify buyer if trader marks as fulfilled
+    if (fulfilled && req.userId !== specialOrder.customerId) {
+      await Notification.create({
+        userId: specialOrder.customerId,
+        title: "Payment Received",
+        message: `The trader has confirmed receipt of payment for your ${specialOrder.vegetableName} order (#${specialOrder.requestNumber}).`,
+        type: "order",
+        relatedId: specialOrder.id,
+      });
+    }
 
     res.json({
       success: true,
@@ -546,6 +563,7 @@ const getTraderAcceptedOrders = async (req, res) => {
       quoteStatus: quote.status,
       deliveryLocation: quote.specialOrder.deliveryLocation,
       deliveryAddress: quote.specialOrder.deliveryAddress,
+      paymentStatus: quote.specialOrder.paymentStatus || "pending",
       createdAt: quote.specialOrder.createdAt,
       customer: quote.specialOrder.customer,
       quote: {
@@ -576,6 +594,83 @@ const getTraderAcceptedOrders = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Mark payment as received
+ * @route   PUT /api/special-orders/:id/payment
+ * @access  Private/Trader
+ */
+const markPaymentReceived = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const specialOrder = await SpecialOrder.findByPk(req.params.id, {
+      include: [
+        { model: TraderQuote, as: "quotes", where: { status: "accepted" } },
+      ],
+      transaction,
+    });
+
+    if (!specialOrder) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    // Check access: only the trader who won the bid can mark it as paid
+    const acceptedQuote = specialOrder.quotes[0];
+    if (!acceptedQuote || acceptedQuote.traderId !== req.userId) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    if (specialOrder.paymentStatus === "received") {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Payment already marked as received",
+      });
+    }
+
+    // Update payment status
+    specialOrder.paymentStatus = "received";
+    await specialOrder.save({ transaction });
+
+    // Increment buyer's total spent now
+    await User.increment(
+      { totalSpent: parseFloat(acceptedQuote.quotedPrice) },
+      { where: { id: specialOrder.customerId }, transaction },
+    );
+
+    await transaction.commit();
+
+    // Notify buyer
+    await Notification.create({
+      userId: specialOrder.customerId,
+      title: "Payment Confirmed",
+      message: `Trader has confirmed receipt of payment (₹${acceptedQuote.quotedPrice}) for order #${specialOrder.requestNumber}.`,
+      type: "order",
+      relatedId: specialOrder.id,
+    });
+
+    res.json({
+      success: true,
+      message: "Payment marked as received",
+      data: { specialOrder },
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Mark payment received error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating payment status",
+    });
+  }
+};
+
 module.exports = {
   getAllSpecialOrders,
   getSpecialOrderById,
@@ -585,4 +680,5 @@ module.exports = {
   rejectQuote,
   closeSpecialOrder,
   getTraderAcceptedOrders,
+  markPaymentReceived,
 };
