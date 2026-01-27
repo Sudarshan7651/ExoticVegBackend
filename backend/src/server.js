@@ -16,6 +16,7 @@ const specialOrderRoutes = require("./routes/specialOrder.routes");
 const traderRoutes = require("./routes/trader.routes");
 const reviewRoutes = require("./routes/review.routes");
 const notificationRoutes = require("./routes/notification.routes");
+const savedTraderRoutes = require("./routes/savedTrader.routes");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -46,6 +47,7 @@ app.use("/api/special-orders", specialOrderRoutes);
 app.use("/api/traders", traderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/saved-traders", savedTraderRoutes);
 
 // Buyer dashboard route
 const { auth } = require("./middleware/auth");

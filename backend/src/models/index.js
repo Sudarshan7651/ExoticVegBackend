@@ -9,6 +9,7 @@ const SpecialOrder = require("./SpecialOrder");
 const TraderQuote = require("./TraderQuote");
 const Review = require("./Review");
 const Notification = require("./Notification");
+const SavedTrader = require("./SavedTrader");
 
 // Define associations
 
@@ -55,7 +56,10 @@ Review.belongsTo(Order, { foreignKey: "orderId", as: "order" });
 Notification.belongsTo(User, { foreignKey: "userId", as: "user" });
 
 User.hasMany(Review, { foreignKey: "traderId", as: "receivedReviews" });
-User.hasMany(Review, { foreignKey: "buyerId", as: "givenReviews" });
+User.hasMany(SavedTrader, { foreignKey: "buyerId", as: "savedTraders" });
+User.hasMany(SavedTrader, { foreignKey: "traderId", as: "savedByBuyers" });
+SavedTrader.belongsTo(User, { foreignKey: "buyerId", as: "buyer" });
+SavedTrader.belongsTo(User, { foreignKey: "traderId", as: "trader" });
 
 module.exports = {
   sequelize,
@@ -67,4 +71,5 @@ module.exports = {
   TraderQuote,
   Review,
   Notification,
+  SavedTrader,
 };
