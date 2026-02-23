@@ -19,6 +19,10 @@ const notificationRoutes = require("./routes/notification.routes");
 const savedTraderRoutes = require("./routes/savedTrader.routes");
 
 const app = express();
+const http = require("http").createServer(app);
+const socketIO = require("./utils/socket");
+socketIO.init(http);
+
 const PORT = process.env.PORT || 3001;
 
 // Connect to PostgreSQL
@@ -120,7 +124,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server - Listen on 0.0.0.0 to be accessible from other devices on the network
-app.listen(PORT, "0.0.0.0", () => {
+http.listen(PORT, "0.0.0.0", () => {
   console.log(`
   ╔════════════════════════════════════════════════════╗
   ║                                                    ║

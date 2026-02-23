@@ -6,6 +6,8 @@ const {
   User,
   Notification,
 } = require("../models");
+const socketIO = require("../utils/socket");
+const { createNotification } = require("./notification.controller");
 
 /**
  * @desc    Get all special orders
@@ -179,6 +181,9 @@ const createSpecialOrder = async (req, res) => {
       deliveryAddress,
     });
 
+    // Emit socket event to notify traders about new special order
+    socketIO.emitEvent("special_order_added", { specialOrder });
+
     res.status(201).json({
       success: true,
       message: "Special order request created",
@@ -245,19 +250,22 @@ const submitQuote = async (req, res) => {
     });
 
     // Notify buyer about new quote
-    await Notification.create({
-      userId: specialOrder.customerId,
-      title: "New Quote Received",
-      message: `${req.user.businessName || req.user.name} submitted a quote of ₹${quotedPrice} for your ${specialOrder.vegetableName} request.`,
-      type: "quote",
-      relatedId: specialOrder.id,
-    });
+    await createNotification(
+      specialOrder.customerId,
+      "New Quote Received",
+      `${req.user.businessName || req.user.name} submitted a quote of ₹${quotedPrice} for your ${specialOrder.vegetableName} request.`,
+      "quote",
+      specialOrder.id,
+    );
 
     // Update status to quoted if first quote
     if (specialOrder.status === "open") {
       specialOrder.status = "quoted";
       await specialOrder.save();
     }
+
+    // Emit socket event for updated order (status might have changed)
+    socketIO.emitEvent("special_order_updated", { specialOrder });
 
     res.status(201).json({
       success: true,
@@ -359,13 +367,19 @@ const acceptQuote = async (req, res) => {
     await transaction.commit();
 
     // Notify trader that their quote was accepted
-    await Notification.create({
-      userId: quote.traderId,
-      title: "Quote Accepted!",
-      message: `Your quote of ₹${quote.quotedPrice} for ${specialOrder.vegetableName} has been accepted by the buyer.`,
-      type: "quote",
-      relatedId: specialOrder.id,
-    });
+    await createNotification(
+      quote.traderId,
+      "Quote Accepted!",
+      `Your quote of ₹${quote.quotedPrice} for ${specialOrder.vegetableName} has been accepted by the buyer.`,
+      "quote",
+      specialOrder.id,
+    );
+
+    // Emit socket event for the accepted order
+    socketIO.emitToUser(quote.traderId, "quote_accepted", { specialOrder });
+
+    // Emit general update event
+    socketIO.emitEvent("special_order_updated", { specialOrder });
 
     res.json({
       success: true,
@@ -471,6 +485,9 @@ const closeSpecialOrder = async (req, res) => {
     specialOrder.status = fulfilled ? "fulfilled" : "closed";
     await specialOrder.save();
 
+    // Emit socket event for updated order
+    socketIO.emitEvent("special_order_updated", { specialOrder });
+
     // Reject any pending quotes
     await TraderQuote.update(
       { status: "rejected" },
@@ -484,13 +501,13 @@ const closeSpecialOrder = async (req, res) => {
 
     // Notify buyer if trader marks as fulfilled
     if (fulfilled && req.userId !== specialOrder.customerId) {
-      await Notification.create({
-        userId: specialOrder.customerId,
-        title: "Payment Received",
-        message: `The trader has confirmed receipt of payment for your ${specialOrder.vegetableName} order (#${specialOrder.requestNumber}).`,
-        type: "order",
-        relatedId: specialOrder.id,
-      });
+      await createNotification(
+        specialOrder.customerId,
+        "Payment Received",
+        `The trader has confirmed receipt of payment for your ${specialOrder.vegetableName} order (#${specialOrder.requestNumber}).`,
+        "order",
+        specialOrder.id,
+      );
     }
 
     res.json({
@@ -648,13 +665,13 @@ const markPaymentReceived = async (req, res) => {
     await transaction.commit();
 
     // Notify buyer
-    await Notification.create({
-      userId: specialOrder.customerId,
-      title: "Payment Confirmed",
-      message: `Trader has confirmed receipt of payment (₹${acceptedQuote.quotedPrice}) for order #${specialOrder.requestNumber}.`,
-      type: "order",
-      relatedId: specialOrder.id,
-    });
+    await createNotification(
+      specialOrder.customerId,
+      "Payment Confirmed",
+      `Trader has confirmed receipt of payment (₹${acceptedQuote.quotedPrice}) for order #${specialOrder.requestNumber}.`,
+      "order",
+      specialOrder.id,
+    );
 
     res.json({
       success: true,

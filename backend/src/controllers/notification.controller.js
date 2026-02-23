@@ -1,4 +1,5 @@
 const { Notification } = require("../models");
+const socketIO = require("../utils/socket");
 
 /**
  * @desc    Get all notifications for user
@@ -119,13 +120,18 @@ const createNotification = async (
   relatedId = null,
 ) => {
   try {
-    return await Notification.create({
+    const notification = await Notification.create({
       userId,
       title,
       message,
       type,
       relatedId,
     });
+
+    // Emit socket event for real-time updates
+    socketIO.emitToUser(userId, "new_notification", { notification });
+
+    return notification;
   } catch (error) {
     console.error("Create notification error:", error);
     return null;

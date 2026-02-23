@@ -503,6 +503,51 @@ const getUserStats = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Upload profile picture
+ * @route   POST /api/users/profile-picture
+ * @access  Private
+ */
+const uploadProfilePicture = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Please upload a file",
+      });
+    }
+
+    const user = await User.findByPk(req.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Save relative path to database
+    const filePath = req.file.path.replace(/\\/g, "/");
+    user.profileImage = filePath;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Profile picture updated successfully",
+      data: {
+        profileImage: filePath,
+        user: user.toSafeJSON(),
+      },
+    });
+  } catch (error) {
+    console.error("Upload profile picture error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error uploading profile picture",
+      error: error.message, // Include error message in dev
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -512,4 +557,5 @@ module.exports = {
   getTraders,
   getBuyerDashboard,
   getUserStats,
+  uploadProfilePicture,
 };

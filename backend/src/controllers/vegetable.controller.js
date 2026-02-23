@@ -1,5 +1,6 @@
-const { Op } = require('sequelize');
-const { Vegetable, User } = require('../models');
+const { Op } = require("sequelize");
+const { Vegetable, User } = require("../models");
+const socketIO = require("../utils/socket");
 
 /**
  * @desc    Get all vegetables
@@ -8,19 +9,19 @@ const { Vegetable, User } = require('../models');
  */
 const getAllVegetables = async (req, res) => {
   try {
-    const { 
-      page = 1, 
-      limit = 20, 
-      category, 
-      search, 
-      minPrice, 
+    const {
+      page = 1,
+      limit = 20,
+      category,
+      search,
+      minPrice,
       maxPrice,
       isOrganic,
       trader,
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortBy = "createdAt",
+      sortOrder = "desc",
     } = req.query;
-    
+
     const offset = (page - 1) * limit;
     const where = { isAvailable: true };
 
@@ -31,7 +32,7 @@ const getAllVegetables = async (req, res) => {
     if (search) {
       where[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } }
+        { description: { [Op.iLike]: `%${search}%` } },
       ];
     }
 
@@ -41,7 +42,7 @@ const getAllVegetables = async (req, res) => {
       if (maxPrice) where.rate[Op.lte] = parseFloat(maxPrice);
     }
 
-    if (isOrganic === 'true') {
+    if (isOrganic === "true") {
       where.isOrganic = true;
     }
 
@@ -51,14 +52,16 @@ const getAllVegetables = async (req, res) => {
 
     const { count, rows: vegetables } = await Vegetable.findAndCountAll({
       where,
-      include: [{
-        model: User,
-        as: 'trader',
-        attributes: ['id', 'name', 'businessName']
-      }],
+      include: [
+        {
+          model: User,
+          as: "trader",
+          attributes: ["id", "name", "businessName"],
+        },
+      ],
       limit: parseInt(limit),
       offset,
-      order: [[sortBy, sortOrder.toUpperCase()]]
+      order: [[sortBy, sortOrder.toUpperCase()]],
     });
 
     res.json({
@@ -69,16 +72,15 @@ const getAllVegetables = async (req, res) => {
           page: parseInt(page),
           limit: parseInt(limit),
           total: count,
-          pages: Math.ceil(count / limit)
-        }
-      }
+          pages: Math.ceil(count / limit),
+        },
+      },
     });
-
   } catch (error) {
-    console.error('Get vegetables error:', error);
+    console.error("Get vegetables error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching vegetables'
+      message: "Error fetching vegetables",
     });
   }
 };
@@ -91,30 +93,31 @@ const getAllVegetables = async (req, res) => {
 const getVegetableById = async (req, res) => {
   try {
     const vegetable = await Vegetable.findByPk(req.params.id, {
-      include: [{
-        model: User,
-        as: 'trader',
-        attributes: ['id', 'name', 'businessName', 'phone', 'isVerified']
-      }]
+      include: [
+        {
+          model: User,
+          as: "trader",
+          attributes: ["id", "name", "businessName", "phone", "isVerified"],
+        },
+      ],
     });
 
     if (!vegetable) {
       return res.status(404).json({
         success: false,
-        message: 'Vegetable not found'
+        message: "Vegetable not found",
       });
     }
 
     res.json({
       success: true,
-      data: { vegetable }
+      data: { vegetable },
     });
-
   } catch (error) {
-    console.error('Get vegetable error:', error);
+    console.error("Get vegetable error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching vegetable'
+      message: "Error fetching vegetable",
     });
   }
 };
@@ -129,31 +132,33 @@ const createVegetable = async (req, res) => {
     const vegetableData = {
       ...req.body,
       traderId: req.userId,
-      traderName: req.user.businessName || req.user.name
+      traderName: req.user.businessName || req.user.name,
     };
 
     const vegetable = await Vegetable.create(vegetableData);
 
+    // Emit socket event for real-time updates
+    socketIO.emitEvent("vegetable_added", { vegetable });
+
     res.status(201).json({
       success: true,
-      message: 'Vegetable added successfully',
-      data: { vegetable }
+      message: "Vegetable added successfully",
+      data: { vegetable },
     });
-
   } catch (error) {
-    console.error('Create vegetable error:', error);
-    
-    if (error.name === 'SequelizeValidationError') {
-      const messages = error.errors.map(err => err.message);
+    console.error("Create vegetable error:", error);
+
+    if (error.name === "SequelizeValidationError") {
+      const messages = error.errors.map((err) => err.message);
       return res.status(400).json({
         success: false,
-        message: messages.join('. ')
+        message: messages.join(". "),
       });
     }
 
     res.status(500).json({
       success: false,
-      message: 'Error creating vegetable'
+      message: "Error creating vegetable",
     });
   }
 };
@@ -170,31 +175,33 @@ const updateVegetable = async (req, res) => {
     if (!vegetable) {
       return res.status(404).json({
         success: false,
-        message: 'Vegetable not found'
+        message: "Vegetable not found",
       });
     }
 
     // Check ownership (unless admin)
-    if (vegetable.traderId !== req.userId && req.user.role !== 'admin') {
+    if (vegetable.traderId !== req.userId && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to update this vegetable'
+        message: "Not authorized to update this vegetable",
       });
     }
 
     await vegetable.update(req.body);
 
+    // Emit socket event for real-time updates
+    socketIO.emitEvent("vegetable_updated", { vegetable });
+
     res.json({
       success: true,
-      message: 'Vegetable updated successfully',
-      data: { vegetable }
+      message: "Vegetable updated successfully",
+      data: { vegetable },
     });
-
   } catch (error) {
-    console.error('Update vegetable error:', error);
+    console.error("Update vegetable error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error updating vegetable'
+      message: "Error updating vegetable",
     });
   }
 };
@@ -211,15 +218,15 @@ const deleteVegetable = async (req, res) => {
     if (!vegetable) {
       return res.status(404).json({
         success: false,
-        message: 'Vegetable not found'
+        message: "Vegetable not found",
       });
     }
 
     // Check ownership (unless admin)
-    if (vegetable.traderId !== req.userId && req.user.role !== 'admin') {
+    if (vegetable.traderId !== req.userId && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to delete this vegetable'
+        message: "Not authorized to delete this vegetable",
       });
     }
 
@@ -227,16 +234,18 @@ const deleteVegetable = async (req, res) => {
     vegetable.isAvailable = false;
     await vegetable.save();
 
+    // Emit socket event for real-time updates
+    socketIO.emitEvent("vegetable_deleted", { id: req.params.id });
+
     res.json({
       success: true,
-      message: 'Vegetable removed successfully'
+      message: "Vegetable removed successfully",
     });
-
   } catch (error) {
-    console.error('Delete vegetable error:', error);
+    console.error("Delete vegetable error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting vegetable'
+      message: "Error deleting vegetable",
     });
   }
 };
@@ -248,24 +257,23 @@ const deleteVegetable = async (req, res) => {
  */
 const getVegetablesByTrader = async (req, res) => {
   try {
-    const vegetables = await Vegetable.findAll({ 
+    const vegetables = await Vegetable.findAll({
       where: {
         traderId: req.params.traderId,
-        isAvailable: true 
+        isAvailable: true,
       },
-      order: [['createdAt', 'DESC']]
+      order: [["createdAt", "DESC"]],
     });
 
     res.json({
       success: true,
-      data: { vegetables }
+      data: { vegetables },
     });
-
   } catch (error) {
-    console.error('Get trader vegetables error:', error);
+    console.error("Get trader vegetables error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching vegetables'
+      message: "Error fetching vegetables",
     });
   }
 };
@@ -278,23 +286,22 @@ const getVegetablesByTrader = async (req, res) => {
 const getCategories = async (req, res) => {
   try {
     const vegetables = await Vegetable.findAll({
-      attributes: ['category'],
-      group: ['category'],
-      where: { isAvailable: true }
+      attributes: ["category"],
+      group: ["category"],
+      where: { isAvailable: true },
     });
 
-    const categories = vegetables.map(v => v.category);
-    
+    const categories = vegetables.map((v) => v.category);
+
     res.json({
       success: true,
-      data: { categories }
+      data: { categories },
     });
-
   } catch (error) {
-    console.error('Get categories error:', error);
+    console.error("Get categories error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching categories'
+      message: "Error fetching categories",
     });
   }
 };
@@ -306,5 +313,5 @@ module.exports = {
   updateVegetable,
   deleteVegetable,
   getVegetablesByTrader,
-  getCategories
+  getCategories,
 };
