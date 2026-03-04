@@ -101,6 +101,8 @@ const updateProfile = async (req, res) => {
       addressState,
       addressPincode,
       gstNumber,
+      latitude,
+      longitude,
     } = req.body;
 
     const user = await User.findByPk(req.userId);
@@ -121,6 +123,8 @@ const updateProfile = async (req, res) => {
     if (addressState) user.addressState = addressState;
     if (addressPincode) user.addressPincode = addressPincode;
     if (gstNumber) user.gstNumber = gstNumber;
+    if (latitude !== undefined) user.latitude = latitude;
+    if (longitude !== undefined) user.longitude = longitude;
 
     await user.save();
 

@@ -165,6 +165,8 @@ const createSpecialOrder = async (req, res) => {
       budgetMax,
       deliveryLocation,
       deliveryAddress,
+      latitude,
+      longitude,
     } = req.body;
 
     const specialOrder = await SpecialOrder.create({
@@ -179,6 +181,8 @@ const createSpecialOrder = async (req, res) => {
       budgetMax,
       deliveryLocation,
       deliveryAddress,
+      latitude,
+      longitude,
     });
 
     // Emit socket event to notify traders about new special order

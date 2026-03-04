@@ -98,6 +98,14 @@ const SpecialOrder = sequelize.define(
       defaultValue: "pending",
       field: "payment_status",
     },
+    latitude: {
+      type: DataTypes.DECIMAL(10, 8),
+      allowNull: true,
+    },
+    longitude: {
+      type: DataTypes.DECIMAL(11, 8),
+      allowNull: true,
+    },
   },
   {
     tableName: "special_orders",

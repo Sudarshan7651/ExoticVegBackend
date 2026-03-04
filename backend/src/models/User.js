@@ -118,6 +118,14 @@ const User = sequelize.define(
       defaultValue: 0,
       field: "rating_count",
     },
+    latitude: {
+      type: DataTypes.DECIMAL(10, 8),
+      allowNull: true,
+    },
+    longitude: {
+      type: DataTypes.DECIMAL(11, 8),
+      allowNull: true,
+    },
   },
   {
     tableName: "users",
