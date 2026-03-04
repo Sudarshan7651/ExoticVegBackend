@@ -125,6 +125,19 @@ app.use((err, req, res, next) => {
 
 // Start server - Listen on 0.0.0.0 to be accessible from other devices on the network
 http.listen(PORT, "0.0.0.0", () => {
+  const os = require("os");
+  const networkInterfaces = os.networkInterfaces();
+  let localIP = "localhost";
+
+  // Find the first non-internal IPv4 address
+  Object.values(networkInterfaces).forEach((interfaces) => {
+    interfaces.forEach((details) => {
+      if (details.family === "IPv4" && !details.internal) {
+        localIP = details.address;
+      }
+    });
+  });
+
   console.log(`
   ╔════════════════════════════════════════════════════╗
   ║                                                    ║
@@ -135,7 +148,7 @@ http.listen(PORT, "0.0.0.0", () => {
   ║   Environment: ${(process.env.NODE_ENV || "development").padEnd(15)}            ║
   ║                                                    ║
   ║   Local:   http://localhost:${PORT}                   ║
-  ║   Network: http://10.43.119.189:${PORT}               ║
+  ║   Network: http://${localIP}:${PORT}               ║
   ║                                                    ║
   ╚════════════════════════════════════════════════════╝
   `);
