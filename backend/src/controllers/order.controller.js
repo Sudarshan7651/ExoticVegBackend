@@ -1,5 +1,14 @@
 const { Op } = require("sequelize");
-const { sequelize, Order, OrderItem, Vegetable, User } = require("../models");
+const {
+  sequelize,
+  Order,
+  OrderItem,
+  Vegetable,
+  User,
+  Notification,
+} = require("../models");
+const socketIO = require("../utils/socket");
+const { createNotification } = require("./notification.controller");
 
 /**
  * @desc    Get all orders (filtered by user role)
@@ -451,10 +460,182 @@ const getOrderStats = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Create order from market (buy ready stock directly)
+ * @route   POST /api/orders/market
+ * @access  Private/Buyer
+ */
+const createMarketOrder = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const {
+      vegetableId,
+      quantity,
+      deliveryStreet,
+      deliveryCity,
+      deliveryState,
+      deliveryPincode,
+      deliveryLandmark,
+      deliveryDate,
+      deliverySlot,
+      paymentMethod,
+      notes,
+    } = req.body;
+
+    if (!vegetableId || !quantity) {
+      return res.status(400).json({
+        success: false,
+        message: "Vegetable ID and quantity are required",
+      });
+    }
+
+    // Find the vegetable
+    const vegetable = await Vegetable.findByPk(vegetableId, {
+      include: [
+        {
+          model: User,
+          as: "trader",
+          attributes: ["id", "name", "businessName"],
+        },
+      ],
+    });
+
+    if (!vegetable || !vegetable.isAvailable) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "This item is no longer available",
+      });
+    }
+
+    // Check stock quantity
+    if (parseFloat(vegetable.quantity) < quantity) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Only ${vegetable.quantity} ${vegetable.unit} available`,
+      });
+    }
+
+    // Check min order quantity
+    if (quantity < parseFloat(vegetable.minOrderQuantity)) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Minimum order quantity is ${vegetable.minOrderQuantity} ${vegetable.unit}`,
+      });
+    }
+
+    const amount = parseFloat(vegetable.rate) * quantity;
+
+    // Create order
+    const order = await Order.create(
+      {
+        customerId: req.userId,
+        customerName: req.user.name,
+        customerPhone: req.user.phone,
+        totalAmount: amount,
+        finalAmount: amount,
+        deliveryStreet: deliveryStreet || req.user.addressStreet,
+        deliveryCity: deliveryCity || req.user.addressCity,
+        deliveryState: deliveryState || req.user.addressState,
+        deliveryPincode: deliveryPincode || req.user.addressPincode,
+        deliveryLandmark,
+        deliveryDate,
+        deliverySlot,
+        paymentMethod: paymentMethod || "cod",
+        notes: notes || `Market order for ${vegetable.name}`,
+        statusHistory: [
+          {
+            status: "pending",
+            timestamp: new Date(),
+            note: `Market order placed for ${quantity} ${vegetable.unit} of ${vegetable.name}`,
+          },
+        ],
+      },
+      { transaction },
+    );
+
+    // Create order item
+    await OrderItem.create(
+      {
+        orderId: order.id,
+        vegetableId: vegetable.id,
+        vegetableName: vegetable.name,
+        quantity,
+        unit: vegetable.unit,
+        rate: vegetable.rate,
+        amount,
+        traderId: vegetable.traderId,
+      },
+      { transaction },
+    );
+
+    // Deduct stock from the vegetable
+    const newQuantity = parseFloat(vegetable.quantity) - quantity;
+    await vegetable.update(
+      {
+        quantity: newQuantity,
+        isAvailable: newQuantity > 0,
+      },
+      { transaction },
+    );
+
+    // Update buyer stats
+    await User.increment(
+      { totalOrders: 1, totalSpent: amount },
+      { where: { id: req.userId }, transaction },
+    );
+
+    await transaction.commit();
+
+    // Send notification to trader
+    await createNotification(
+      vegetable.traderId,
+      "New Market Order!",
+      `${req.user.name} ordered ${quantity} ${vegetable.unit} of ${vegetable.name} for ₹${amount.toFixed(2)}`,
+      "order",
+      order.id,
+    );
+
+    // Emit socket events
+    socketIO.emitToUser(vegetable.traderId, "new_market_order", {
+      orderId: order.id,
+      vegetableName: vegetable.name,
+      quantity,
+      buyerName: req.user.name,
+    });
+    socketIO.emitEvent("stock_updated", {
+      vegetableId: vegetable.id,
+      newQuantity,
+    });
+
+    // Fetch complete order
+    const completeOrder = await Order.findByPk(order.id, {
+      include: [{ model: OrderItem, as: "items" }],
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Order placed successfully!",
+      data: { order: completeOrder },
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Create market order error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error creating order",
+    });
+  }
+};
+
 module.exports = {
   getAllOrders,
   getOrderById,
   createOrder,
+  createMarketOrder,
   updateOrderStatus,
   cancelOrder,
   getOrderStats,

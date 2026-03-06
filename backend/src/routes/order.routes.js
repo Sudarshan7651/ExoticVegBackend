@@ -41,6 +41,7 @@ router.get("/", auth, orderController.getAllOrders);
 router.get("/stats", auth, orderController.getOrderStats);
 router.get("/:id", auth, orderController.getOrderById);
 router.post("/", auth, orderValidation, validate, orderController.createOrder);
+router.post("/market", auth, orderController.createMarketOrder);
 router.put(
   "/:id/status",
   auth,
