@@ -39,16 +39,22 @@ const statusValidation = [
 // Routes
 router.get("/", auth, orderController.getAllOrders);
 router.get("/stats", auth, orderController.getOrderStats);
+router.get("/trader/market", auth, orderController.getTraderMarketOrders);
 router.get("/:id", auth, orderController.getOrderById);
 router.post("/", auth, orderValidation, validate, orderController.createOrder);
 router.post("/market", auth, orderController.createMarketOrder);
 router.put(
   "/:id/status",
   auth,
-  isTrader,
   statusValidation,
   validate,
   orderController.updateOrderStatus,
+);
+router.put(
+  "/:id/payment",
+  auth,
+  isTrader,
+  orderController.markMarketPaymentPaid,
 );
 router.put("/:id/cancel", auth, orderController.cancelOrder);
 
