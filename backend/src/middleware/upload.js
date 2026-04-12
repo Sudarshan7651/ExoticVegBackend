@@ -37,4 +37,7 @@ const upload = multer({
   },
 });
 
-module.exports = upload;
+// Upload multiple files
+const uploadMultiple = upload.array('documents', 5);
+
+module.exports = { upload, uploadMultiple };
