@@ -88,6 +88,16 @@ const User = sequelize.define(
       defaultValue: false,
       field: "is_verified",
     },
+    verificationStatus: {
+      type: DataTypes.ENUM("pending", "verified", "rejected"),
+      defaultValue: "pending",
+      field: "verification_status",
+    },
+    verificationDocuments: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: "verification_documents",
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,

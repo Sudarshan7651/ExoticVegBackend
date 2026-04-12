@@ -79,10 +79,27 @@ const getAllSpecialOrders = async (req, res) => {
     const { count, rows: specialOrders } =
       await SpecialOrder.findAndCountAll(queryOptions);
 
+    // Filter payment status based on user role
+    const filteredOrders = specialOrders.map((order) => {
+      const orderData = order.toJSON();
+      if (req.user.role === "buyer") {
+        // Buyer sees only their payment status
+        orderData.paymentStatus = orderData.buyerPaymentStatus;
+        delete orderData.buyerPaymentStatus;
+        delete orderData.traderPaymentStatus;
+      } else if (req.user.role === "trader") {
+        // Trader sees only their payment status
+        orderData.paymentStatus = orderData.traderPaymentStatus;
+        delete orderData.buyerPaymentStatus;
+        delete orderData.traderPaymentStatus;
+      }
+      return orderData;
+    });
+
     res.json({
       success: true,
       data: {
-        specialOrders,
+        specialOrders: filteredOrders,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -135,9 +152,23 @@ const getSpecialOrderById = async (req, res) => {
       });
     }
 
+    // Filter payment status based on user role
+    const responseData = specialOrder.toJSON();
+    if (req.user.role === "buyer") {
+      // Buyer sees only their payment status
+      responseData.paymentStatus = responseData.buyerPaymentStatus;
+      delete responseData.buyerPaymentStatus;
+      delete responseData.traderPaymentStatus;
+    } else if (req.user.role === "trader") {
+      // Trader sees only their payment status
+      responseData.paymentStatus = responseData.traderPaymentStatus;
+      delete responseData.buyerPaymentStatus;
+      delete responseData.traderPaymentStatus;
+    }
+
     res.json({
       success: true,
-      data: { specialOrder },
+      data: { specialOrder: responseData },
     });
   } catch (error) {
     console.error("Get special order error:", error);
@@ -507,8 +538,8 @@ const closeSpecialOrder = async (req, res) => {
     if (fulfilled && req.userId !== specialOrder.customerId) {
       await createNotification(
         specialOrder.customerId,
-        "Payment Received",
-        `The trader has confirmed receipt of payment for your ${specialOrder.vegetableName} order (#${specialOrder.requestNumber}).`,
+        "Order Fulfilled",
+        `The trader has fulfilled your ${specialOrder.vegetableName} order (#${specialOrder.requestNumber}).`,
         "order",
         specialOrder.id,
       );
@@ -584,7 +615,7 @@ const getTraderAcceptedOrders = async (req, res) => {
       quoteStatus: quote.status,
       deliveryLocation: quote.specialOrder.deliveryLocation,
       deliveryAddress: quote.specialOrder.deliveryAddress,
-      paymentStatus: quote.specialOrder.paymentStatus || "pending",
+      paymentStatus: quote.specialOrder.traderPaymentStatus || "pending",
       createdAt: quote.specialOrder.createdAt,
       customer: quote.specialOrder.customer,
       quote: {
@@ -616,8 +647,8 @@ const getTraderAcceptedOrders = async (req, res) => {
 };
 
 /**
- * @desc    Mark payment as received
- * @route   PUT /api/special-orders/:id/payment
+ * @desc    Mark payment as received by trader
+ * @route   PUT /api/special-orders/:id/trader-payment
  * @access  Private/Trader
  */
 const markPaymentReceived = async (req, res) => {
@@ -648,7 +679,7 @@ const markPaymentReceived = async (req, res) => {
       });
     }
 
-    if (specialOrder.paymentStatus === "received") {
+    if (specialOrder.traderPaymentStatus === "received") {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
@@ -656,8 +687,8 @@ const markPaymentReceived = async (req, res) => {
       });
     }
 
-    // Update payment status
-    specialOrder.paymentStatus = "received";
+    // Update trader payment status
+    specialOrder.traderPaymentStatus = "received";
     await specialOrder.save({ transaction });
 
     // Increment buyer's total spent now
@@ -692,6 +723,79 @@ const markPaymentReceived = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Mark payment as paid by buyer
+ * @route   PUT /api/special-orders/:id/buyer-payment
+ * @access  Private/Buyer
+ */
+const markBuyerPaymentPaid = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const specialOrder = await SpecialOrder.findByPk(req.params.id, {
+      include: [
+        { model: TraderQuote, as: "quotes", where: { status: "accepted" } },
+      ],
+      transaction,
+    });
+
+    if (!specialOrder) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    // Check access: only the buyer who placed the order can mark payment as paid
+    if (specialOrder.customerId !== req.userId) {
+      await transaction.rollback();
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    if (specialOrder.buyerPaymentStatus === "paid") {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Payment already marked as paid",
+      });
+    }
+
+    // Update buyer payment status
+    specialOrder.buyerPaymentStatus = "paid";
+    await specialOrder.save({ transaction });
+
+    await transaction.commit();
+
+    // Notify trader
+    const acceptedQuote = specialOrder.quotes[0];
+    if (acceptedQuote) {
+      await createNotification(
+        acceptedQuote.traderId,
+        "Payment Initiated",
+        `Buyer has marked payment as paid for order #${specialOrder.requestNumber}.`,
+        "order",
+        specialOrder.id,
+      );
+    }
+
+    res.json({
+      success: true,
+      message: "Payment marked as paid",
+      data: { specialOrder },
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Mark buyer payment paid error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating payment status",
+    });
+  }
+};
+
 module.exports = {
   getAllSpecialOrders,
   getSpecialOrderById,
@@ -702,4 +806,5 @@ module.exports = {
   closeSpecialOrder,
   getTraderAcceptedOrders,
   markPaymentReceived,
+  markBuyerPaymentPaid,
 };

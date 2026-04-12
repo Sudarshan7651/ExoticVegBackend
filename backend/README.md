@@ -6,10 +6,12 @@ Backend API server for the ExoticVeg360 mobile application.
 
 - **Runtime**: Node.js
 - **Framework**: Express.js
-- **Database**: MongoDB with Mongoose ODM
+- **Database**: PostgreSQL with Sequelize ORM
 - **Authentication**: JWT (JSON Web Tokens)
 - **Validation**: express-validator
 - **Security**: bcryptjs for password hashing
+- **Real-time**: Socket.IO
+- **Push Notifications**: Expo Server SDK
 
 ## 📁 Project Structure
 
@@ -80,8 +82,10 @@ backend/
 
    ```
    PORT=3001
-   MONGODB_URI=mongodb://localhost:27017/exoticveg360
+   DATABASE_URL=postgresql://username:password@localhost:5432/exoticveg360
    JWT_SECRET=your-secret-key-here
+   NODE_ENV=development
+   CORS_ORIGIN=*
    ```
 
 5. Start the server:
@@ -149,6 +153,29 @@ backend/
 | POST   | `/api/special-orders/:id/quote`           | Submit quote       | Trader |
 | PUT    | `/api/special-orders/:id/accept/:quoteId` | Accept quote       | Yes    |
 | PUT    | `/api/special-orders/:id/close`           | Close order        | Yes    |
+
+### Reviews
+
+| Method | Endpoint              | Description    | Auth   |
+| ------ | --------------------- | -------------- | ------ |
+| GET    | `/api/reviews`        | Get reviews    | No     |
+| POST   | `/api/reviews`        | Create review  | Yes    |
+
+### Saved Traders
+
+| Method | Endpoint                  | Description         | Auth  |
+| ------ | ------------------------- | ------------------- | ----- |
+| GET    | `/api/saved-traders`      | Get saved traders   | Yes   |
+| POST   | `/api/saved-traders`      | Save trader         | Yes   |
+| DELETE | `/api/saved-traders/:id`  | Remove saved trader | Yes   |
+
+### Notifications
+
+| Method | Endpoint                   | Description        | Auth  |
+| ------ | -------------------------- | ------------------ | ----- |
+| GET    | `/api/notifications`       | Get notifications  | Yes   |
+| PUT    | `/api/notifications/:id`   | Mark as read       | Yes   |
+| DELETE | `/api/notifications/:id`   | Delete notification| Yes   |
 
 ### Traders
 

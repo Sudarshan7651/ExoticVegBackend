@@ -17,6 +17,10 @@ const traderRoutes = require("./routes/trader.routes");
 const reviewRoutes = require("./routes/review.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const savedTraderRoutes = require("./routes/savedTrader.routes");
+const refundRoutes = require("./routes/refund.routes");
+const reviewModerationRoutes = require("./routes/reviewModeration.routes");
+const verificationRoutes = require("./routes/verification.routes");
+const orderModificationRoutes = require("./routes/orderModification.routes");
 
 const app = express();
 const http = require("http").createServer(app);
@@ -30,7 +34,7 @@ connectDB();
 
 // Middleware
 app.use(
-  cors({
+  cors({ 
     origin: process.env.CORS_ORIGIN || "*",
     credentials: true,
   }),
@@ -48,6 +52,10 @@ app.use("/api/users", userRoutes);
 app.use("/api/vegetables", vegetableRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/special-orders", specialOrderRoutes);
+app.use("/api/refunds", refundRoutes);
+app.use("/api/review-moderation", reviewModerationRoutes);
+app.use("/api/verification", verificationRoutes);
+app.use("/api/order-modifications", orderModificationRoutes);
 app.use("/api/traders", traderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/notifications", notificationRoutes);

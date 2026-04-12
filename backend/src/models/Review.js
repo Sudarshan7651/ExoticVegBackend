@@ -36,6 +36,15 @@ const Review = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true,
     },
+    status: {
+      type: DataTypes.ENUM("pending", "approved", "rejected"),
+      defaultValue: "pending",
+    },
+    moderationReason: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "moderation_reason",
+    },
   },
   {
     tableName: "reviews",
