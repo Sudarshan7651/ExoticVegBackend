@@ -306,6 +306,66 @@ const getCategories = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Get vegetable name suggestions based on user query
+ * @route   GET /api/vegetables/suggestions?q=query
+ * @access  Public
+ */
+const getVegetableSuggestions = async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q) {
+      return res.json({ success: true, data: { suggestions: [] } });
+    }
+
+    const searchQuery = q.toLowerCase();
+
+    // Standard list of vegetables provided by user
+    const standardVegetables = [
+      'brocolli',
+      'broccoli', // added correct spelling
+      'red cabbage',
+      'cherry tomato',
+      'parsley',
+      'zuchanni',
+      'zucchini' // added correct spelling
+    ];
+
+    // Get any distinct vegetables from the database matching the query
+    const dbVegetables = await Vegetable.findAll({
+      attributes: ['name'],
+      where: {
+        name: {
+          [Op.iLike]: `%${searchQuery}%`
+        },
+        isAvailable: true
+      },
+      group: ['name'],
+      limit: 10
+    });
+
+    const dbVegetableNames = dbVegetables.map(v => v.name.toLowerCase());
+
+    // Filter standard vegetables that match the query
+    const standardMatches = standardVegetables.filter(v => v.includes(searchQuery));
+
+    // Combine and get unique suggestions
+    const combinedSuggestions = [...new Set([...standardMatches, ...dbVegetableNames])].slice(0, 10);
+
+    res.json({
+      success: true,
+      data: { suggestions: combinedSuggestions }
+    });
+  } catch (error) {
+    console.error("Get vegetable suggestions error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching suggestions"
+    });
+  }
+};
+
 module.exports = {
   getAllVegetables,
   getVegetableById,
@@ -314,4 +374,5 @@ module.exports = {
   deleteVegetable,
   getVegetablesByTrader,
   getCategories,
+  getVegetableSuggestions
 };

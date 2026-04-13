@@ -33,6 +33,7 @@ const vegetableValidation = [
 router.get('/', vegetableController.getAllVegetables);
 router.get('/categories', vegetableController.getCategories);
 router.get('/trader/:traderId', vegetableController.getVegetablesByTrader);
+router.get('/suggestions', vegetableController.getVegetableSuggestions);
 router.get('/:id', vegetableController.getVegetableById);
 
 // Protected routes (Trader only)
