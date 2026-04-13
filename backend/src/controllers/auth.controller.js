@@ -31,9 +31,24 @@ const register = async (req, res) => {
       gstNumber,
     } = req.body;
 
+    // Trim whitespace from all string fields
+    const trimmedData = {
+      name: name?.trim(),
+      email: email?.trim().toLowerCase(),
+      phone: phone?.trim().replace(/[^0-9]/g, ""),
+      password,
+      role,
+      businessName: businessName?.trim(),
+      addressStreet: addressStreet?.trim(),
+      addressCity: addressCity?.trim(),
+      addressState: addressState?.trim(),
+      addressPincode: addressPincode?.trim(),
+      gstNumber: gstNumber?.trim().toUpperCase(),
+    };
+
     // Check if user already exists
     const existingUser = await User.findOne({
-      where: { email },
+      where: { email: trimmedData.email },
     });
 
     if (existingUser) {
@@ -45,7 +60,7 @@ const register = async (req, res) => {
 
     // Check phone
     const existingPhone = await User.findOne({
-      where: { phone },
+      where: { phone: trimmedData.phone },
     });
 
     if (existingPhone) {
@@ -57,17 +72,17 @@ const register = async (req, res) => {
 
     // Create new user
     const user = await User.create({
-      name,
-      email,
-      phone,
-      password,
-      role: role || "buyer",
-      businessName,
-      addressStreet,
-      addressCity,
-      addressState,
-      addressPincode,
-      gstNumber,
+      name: trimmedData.name,
+      email: trimmedData.email,
+      phone: trimmedData.phone,
+      password: trimmedData.password,
+      role: trimmedData.role || "buyer",
+      businessName: trimmedData.businessName,
+      addressStreet: trimmedData.addressStreet,
+      addressCity: trimmedData.addressCity,
+      addressState: trimmedData.addressState,
+      addressPincode: trimmedData.addressPincode,
+      gstNumber: trimmedData.gstNumber,
     });
 
     // Generate token
@@ -115,8 +130,12 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Trim email and password
+    const trimmedEmail = email?.trim().toLowerCase();
+    const trimmedPassword = password?.trim();
+
     // Find user
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ where: { email: trimmedEmail } });
 
     if (!user) {
       return res.status(401).json({
@@ -134,7 +153,7 @@ const login = async (req, res) => {
     }
 
     // Compare password
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await user.comparePassword(trimmedPassword);
 
     if (!isMatch) {
       return res.status(401).json({
