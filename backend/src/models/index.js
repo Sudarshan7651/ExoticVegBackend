@@ -10,6 +10,8 @@ const TraderQuote = require("./TraderQuote");
 const Review = require("./Review");
 const Notification = require("./Notification");
 const SavedTrader = require("./SavedTrader");
+const RefundRequest = require("./RefundRequest");
+const OrderModification = require("./OrderModification");
 
 // Define associations
 
@@ -72,4 +74,6 @@ module.exports = {
   Review,
   Notification,
   SavedTrader,
+  RefundRequest,
+  OrderModification,
 };
